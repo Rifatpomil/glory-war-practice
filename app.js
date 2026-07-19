@@ -10,10 +10,18 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let db = null;
-try {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-} catch (e) {
+let firebaseAvailable = false;
+
+// Only initialize Firebase if credentials are configured
+if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firebaseAvailable = true;
+  } catch (e) {
+    console.warn('Firebase initialization failed:', e);
+  }
+} else {
   console.warn('Firebase not configured. Using localStorage fallback.');
 }
 
