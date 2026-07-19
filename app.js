@@ -1,30 +1,3 @@
-// Firebase Configuration - REPLACE WITH YOUR OWN CREDENTIALS
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-// Initialize Firebase
-let db = null;
-let firebaseAvailable = false;
-
-// Only initialize Firebase if credentials are configured
-if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-  try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    firebaseAvailable = true;
-  } catch (e) {
-    console.warn('Firebase initialization failed:', e);
-  }
-} else {
-  console.warn('Firebase not configured. Using localStorage fallback.');
-}
-
 const STORAGE_KEYS = {
   settings: 'gloryWar_settings',
   scores: 'gloryWar_scores',
@@ -79,24 +52,7 @@ function saveSettings() {
   localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
 }
 
-async function loadScores() {
-  // Try Firebase first
-  if (db) {
-    try {
-      const snapshot = await db.collection('scores')
-        .orderBy('timeMs', 'asc')
-        .limit(50)
-        .get();
-      
-      if (!snapshot.empty) {
-        return snapshot.docs.map(doc => doc.data());
-      }
-    } catch (e) {
-      console.warn('Firebase load failed, using localStorage:', e);
-    }
-  }
-  
-  // Fallback to localStorage
+function loadScores() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.scores);
     if (raw) return JSON.parse(raw);
@@ -104,26 +60,13 @@ async function loadScores() {
   return [];
 }
 
-async function saveScore(name, timeMs) {
-  const scoreData = {
+function saveScore(name, timeMs) {
+  const scores = loadScores();
+  scores.push({
     name,
     timeMs,
     date: new Date().toISOString(),
-  };
-
-  // Save to Firebase if available
-  if (db) {
-    try {
-      await db.collection('scores').add(scoreData);
-      return;
-    } catch (e) {
-      console.warn('Firebase save failed, using localStorage:', e);
-    }
-  }
-  
-  // Fallback to localStorage
-  const scores = await loadScores();
-  scores.push(scoreData);
+  });
   scores.sort((a, b) => a.timeMs - b.timeMs);
   localStorage.setItem(STORAGE_KEYS.scores, JSON.stringify(scores.slice(0, 50)));
 }
@@ -148,8 +91,8 @@ function showScreen(screen) {
   screen.classList.add('active');
 }
 
-async function renderScores() {
-  const scores = await loadScores();
+function renderScores() {
+  const scores = loadScores();
   const list = $('#scores-list');
   if (scores.length === 0) {
     list.innerHTML = '<div class="scores-empty">No times recorded yet</div>';
@@ -260,12 +203,12 @@ function onSelectOpponent() {
   opponentModal.classList.remove('hidden');
 }
 
-async function onDeclareWar() {
+function onDeclareWar() {
   if (!reactionStartTime) return;
   const elapsed = performance.now() - reactionStartTime;
   const playerName = localStorage.getItem(STORAGE_KEYS.playerName) || 'Anonymous';
 
-  await saveScore(playerName, elapsed);
+  saveScore(playerName, elapsed);
 
   opponentModal.classList.add('hidden');
   $('#result-time').textContent = formatTime(elapsed);
@@ -305,20 +248,20 @@ function saveSettingsFromModal() {
   settingsModal.classList.add('hidden');
 }
 
-async function init() {
+function init() {
   const savedName = localStorage.getItem(STORAGE_KEYS.playerName);
   if (savedName) $('#player-name').value = savedName;
 
-  await renderScores();
+  renderScores();
 
   $('#start-practice').addEventListener('click', startPractice);
   $('#open-settings').addEventListener('click', openSettings);
   $('#close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
   $('#save-settings').addEventListener('click', saveSettingsFromModal);
-  $('#clear-scores').addEventListener('click', async () => {
+  $('#clear-scores').addEventListener('click', () => {
     if (confirm('Clear all saved scores?')) {
       localStorage.removeItem(STORAGE_KEYS.scores);
-      await renderScores();
+      renderScores();
     }
   });
 
@@ -330,11 +273,11 @@ async function init() {
     startCountdown();
   });
 
-  $('#back-to-home').addEventListener('click', async () => {
+  $('#back-to-home').addEventListener('click', () => {
     resetPracticeUI();
     resultOverlay.classList.add('hidden');
     showScreen(startScreen);
-    await renderScores();
+    renderScores();
   });
 
   $('#back-home').addEventListener('click', () => {
